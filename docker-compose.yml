@@ -1,0 +1,76 @@
+version: '3'
+
+services:
+  frontend_api:
+    build: ./frontend_api
+    ports:
+      - "8001:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=frontend_api.settings
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./frontend_api/.env
+    depends_on:
+      # - db_frontend
+      - redis
+      - celery
+    command: gunicorn frontend_api.wsgi:application --workers 3 --bind 0.0.0.0:8000
+
+  admin_api:
+    build: ./admin_api
+    ports:
+      - "8002:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=admin_api.settings
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./admin_api/.env
+    depends_on:
+      - db_admin
+      - redis
+      - celery
+    command: gunicorn admin_api.wsgi:application --workers 3 --bind 0.0.0.0:8000
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_DB=0
+    volumes:
+      - redis-data:/data
+
+  db_frontend:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: ${FRONTEND_DB_NAME}
+      POSTGRES_USER: ${FRONTEND_DB_USER}
+      POSTGRES_PASSWORD: grace_123
+      command: bash -c 'echo ppppp $FRONTEND_DB_NAME $FRONTEND_DB_USER $FRONTEND_DB_PASSWORD && sleep infinity'
+    volumes:
+      - frontend-pg-data:/var/lib/postgresql/data
+
+  db_admin:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: ${ADMIN_DB_NAME}
+      POSTGRES_USER: ${ADMIN_DB_USER}
+      POSTGRES_PASSWORD: grace_123
+    volumes:
+      - admin-pg-data:/var/lib/postgresql/data
+
+  celery:
+    build: ./frontend_api
+    command: celery -A frontend_api worker --loglevel=info
+    environment:
+      - DJANGO_SETTINGS_MODULE=frontend_api.settings
+    env_file:
+      - ./frontend_api/.env
+    depends_on:
+      - redis
+      - db_frontend
+
+volumes:
+  redis-data:
+  frontend-pg-data:
+  admin-pg-data:
