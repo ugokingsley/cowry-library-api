@@ -5,5 +5,7 @@ A library management system using Django REST Framework with JWT authentication,
 The system consists of three main components:
 
 **Frontend API Service** - handles user interactions and book catalog
+
 **Admin API Service** - manages books and user administration
+
 **Message Broker (Redis)** - enables communication between services
