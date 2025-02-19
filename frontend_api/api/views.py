@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 def publish_message(event, data):
     connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
     channel = connection.channel()
-    channel.queue_declare(queue="borrow_updates")
+    channel.queue_declare(queue="borrow_updates", durable=True)
     message = json.dumps({"event": event, "data": data})
     channel.basic_publish(exchange="", routing_key="borrow_updates", body=message)
     connection.close()
@@ -66,8 +66,6 @@ class BorrowBookView(APIView):
             book.is_available = False
             book.expected_return_date = expected_return_date
             book.save()
-            
-            publish_message("book_borrowed", {"book_id": book.id})
 
             # Create borrowing record
             BorrowRecord.objects.create(
@@ -85,6 +83,10 @@ class BorrowBookView(APIView):
             return Response({
                 'error': 'Book not found'
             }, status=status.HTTP_404_NOT_FOUND)
+
+    def perform_create(self, serializer):
+        book = serializer.save()
+        publish_message("book_borrowed", {"book_id": book.id})
 
     def _calculate_return_date(self, days):
         return datetime.now() + timedelta(days=days)

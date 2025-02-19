@@ -9,12 +9,15 @@ from rest_framework.filters import OrderingFilter
 from rest_framework import viewsets
 from .tasks import notify_frontend_of_book_change
 import pika
+import json
+
+RABBITMQ_HOST="rabbitmq"
 
 # Connect to RabbitMQ
 def publish_message(event, data):
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
     channel = connection.channel()
-    channel.queue_declare(queue="book_updates")
+    channel.queue_declare(queue="book_updates", durable=True)
     message = json.dumps({"event": event, "data": data})
     channel.basic_publish(exchange="", routing_key="book_updates", body=message)
     connection.close()
@@ -31,7 +34,12 @@ class AdminBookViewSet(viewsets.ModelViewSet):
         serializer = BookSerializer(data=request.data)
         if serializer.is_valid():
             book = serializer.save()
-            publish_message("book_added", 
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def perform_create(self, serializer):
+        book = serializer.save()
+        publish_message("book_added", 
                 {
                     "id": book.id, 
                     "title": book.title, 
@@ -39,8 +47,6 @@ class AdminBookViewSet(viewsets.ModelViewSet):
                     "category": book.category,
                     "expected_return_date": book.expected_return_date
                     })
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserManagementView(generics.ListAPIView):
