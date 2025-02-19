@@ -8,7 +8,17 @@ from .serializers import UserSerializer, BookSerializer, BorrowRecordSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import viewsets
+import pika
+from datetime import datetime, timedelta
 
+# Connect to RabbitMQ
+def publish_message(event, data):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+    channel = connection.channel()
+    channel.queue_declare(queue="borrow_updates")
+    message = json.dumps({"event": event, "data": data})
+    channel.basic_publish(exchange="", routing_key="borrow_updates", body=message)
+    connection.close()
 
 class UserRegistrationView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -54,11 +64,12 @@ class BorrowBookView(APIView):
             borrow_days = int(request.data.get('days', 14))
             expected_return_date = self._calculate_return_date(borrow_days)
             
-            # Update book availability
             book.is_available = False
             book.expected_return_date = expected_return_date
             book.save()
             
+            publish_message("book_borrowed", {"book_id": book.id})
+
             # Create borrowing record
             BorrowRecord.objects.create(
                 user=request.user,
@@ -77,5 +88,4 @@ class BorrowBookView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
     def _calculate_return_date(self, days):
-        from datetime import datetime, timedelta
         return datetime.now() + timedelta(days=days)

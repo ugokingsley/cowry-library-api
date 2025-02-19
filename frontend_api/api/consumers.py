@@ -1,59 +1,28 @@
-# frontend_api/consumers.py
+import pika
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
-from asgiref.sync import async_to_sync
-from .models import Book
+import django
+import os
+from models import Book
 
-class CatalogueUpdateConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        # Join room group
-        self.room_group_name = 'catalogue_updates'
-        
-        # Join room
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "frontend_api.settings")
+django.setup()
+
+def process_message(ch, method, properties, body):
+    data = json.loads(body)
+    if data.get("event") == "book_added":
+        book_data = data.get("data")
+        Book.objects.create(
+            id=book_data["id"], 
+            title=book_data["title"],
+            publisher=book_data["publisher"], 
+            category=book_data["category"],
+            expected_return_date=book_data["expected_return_date"]
         )
-        
-        await self.accept()
-    
-    async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-    
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        message = text_data_json['message']
-        
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': message
-        }))
-    
-    # Receive message from room group
-    async def book_update(self, event):
-        book_data = event['data']
-        
-        # Update local database
-        try:
-            book, created = Book.objects.get_or_create(id=book_data['id'])
-            book.title = book_data['title']
-            book.publisher = book_data['publisher']
-            book.category = book_data['category']
-            book.is_available = book_data['is_available']
-            book.expected_return_date = book_data['expected_return_date']
-            book.save()
-            
-            # Send confirmation to WebSocket
-            await self.send(text_data=json.dumps({
-                'message': 'Book updated successfully',
-                'book_id': book.id
-            }))
-        except Exception as e:
-            await self.send(text_data=json.dumps({
-                'error': str(e)
-            }))
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+channel = connection.channel()
+channel.queue_declare(queue="book_updates")
+channel.basic_consume(queue="book_updates", on_message_callback=process_message, auto_ack=True)
+
+print("Listening for messages...")
+channel.start_consuming()

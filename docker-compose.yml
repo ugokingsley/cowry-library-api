@@ -11,7 +11,7 @@ services:
     env_file:
       - ./frontend_api/.env
     depends_on:
-      # - db_frontend
+      - db_frontend
       - redis
       - celery
     command: gunicorn frontend_api.wsgi:application --workers 3 --bind 0.0.0.0:8000
@@ -31,6 +31,12 @@ services:
       - celery
     command: gunicorn admin_api.wsgi:application --workers 3 --bind 0.0.0.0:8000
 
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      
   redis:
     image: redis:alpine
     ports:

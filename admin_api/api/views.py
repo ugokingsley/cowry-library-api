@@ -8,8 +8,16 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from rest_framework import viewsets
 from .tasks import notify_frontend_of_book_change
+import pika
 
-
+# Connect to RabbitMQ
+def publish_message(event, data):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+    channel = connection.channel()
+    channel.queue_declare(queue="book_updates")
+    message = json.dumps({"event": event, "data": data})
+    channel.basic_publish(exchange="", routing_key="book_updates", body=message)
+    connection.close()
 
 class AdminBookViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
@@ -23,16 +31,17 @@ class AdminBookViewSet(viewsets.ModelViewSet):
         serializer = BookSerializer(data=request.data)
         if serializer.is_valid():
             book = serializer.save()
-            
-            task_id = notify_frontend_of_book_change.delay(book.id).id
-            
-            return Response({
-                'message': 'Book added successfully',
-                'task_id': task_id,
-                'book_id': book.id
-            }, status=status.HTTP_201_CREATED)
-        
+            publish_message("book_added", 
+                {
+                    "id": book.id, 
+                    "title": book.title, 
+                    "publisher": book.publisher,
+                    "category": book.category,
+                    "expected_return_date": book.expected_return_date
+                    })
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UserManagementView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
