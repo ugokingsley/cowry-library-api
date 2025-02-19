@@ -50,25 +50,26 @@ class BorrowBookView(viewsets.ModelViewSet):
     queryset = BorrowRecord.objects.all()
     serializer_class = BorrowRecordSerializer
 
-    def post(self, request):
+    def create(self, request):
         book_id = request.data['book_id']
-        days = request.data['days']
+        days = int(request.data['days'])
         try:
-            book = Book.objects.get(id=book_id)
+            book = Book.objects.filter(id=book_id)
 
             if not book.exists():
                 return Response({
                     'error': 'Book with id does not exist',
                 }, status=status.HTTP_400_BAD_REQUEST)
 
+            book = book.first()
+            
             if not book.is_available:
                 return Response({
                     'error': 'Book is currently unavailable',
                     'expected_return_date': book.expected_return_date
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
-            borrow_days = int(days)
-            expected_return_date = self._calculate_return_date(borrow_days)
+            expected_return_date = self._calculate_return_date(days)
             
             book.is_available = False
             book.save()

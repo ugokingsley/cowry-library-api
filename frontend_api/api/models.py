@@ -16,7 +16,7 @@ class Book(models.Model):
     expected_return_date = models.DateField(null=True, blank=True)
 
 class BorrowRecord(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE,null=True, blank=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
     borrow_date = models.DateField(auto_now_add=True)
     expected_return_date = models.DateField()
