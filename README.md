@@ -13,20 +13,24 @@ The system consists of three main components:
 **Key Features**
 
 **Frontend API**
+
 Users can register, browse, filter, and borrow books.
 Listens to RabbitMQ for new book additions.
 Publishes borrow events to RabbitMQ.
 
 **Backend/Admin API**
+
 Admins can add and remove books.
 Tracks borrowed books and unavailable ones.
 Publishes book additions to RabbitMQ.
 Listens for borrow events to update book availability.
 
 **RabbitMQ Messaging**
+
 Book Added Event: Admin API → RabbitMQ → Frontend API updates book catalog.
 Book Borrowed Event: Frontend API → RabbitMQ → Admin API marks book as unavailable.
 
 **Deployment**
+
 Uses Docker Compose to orchestrate the services and RabbitMQ.
 Each service runs independently but synchronizes via RabbitMQ.
