@@ -8,6 +8,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=frontend_api.settings
       - PYTHONUNBUFFERED=1
+      - RABBITMQ_HOST=rabbitmq
     env_file:
       - ./frontend_api/.env
     depends_on:
@@ -24,6 +25,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=admin_api.settings
       - PYTHONUNBUFFERED=1
+      - RABBITMQ_HOST=rabbitmq
     env_file:
       - ./admin_api/.env
     depends_on:
